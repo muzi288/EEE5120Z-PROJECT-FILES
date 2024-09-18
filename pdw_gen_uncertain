@@ -1,0 +1,111 @@
+import numpy as np
+import random
+import csv
+import matplotlib.pyplot as plt
+
+# Constants based on the provided table
+TOA_RES = 500e-9  # 500 ns
+AOA_RES = 1.40625  # degrees
+AMP_RES = 1  # dB
+FREQ_RES = 3.90625e6  # MHz
+PW_RES = 500e-9  # 500 ns
+
+# Radar parameters
+radar_parameters = {
+    "radar1": {"TOA_start": 1e-6, "AOA": 45, "Amp": -20, "Freq": 9.47e9, "PW": 1100e-9, "PRI": 100e-6},
+    "radar2": {"TOA_start": 11.5e-6, "AOA": 86, "Amp": -15, "Freq": 11.9e9, "PW": 750e-9, "PRI": 10e-6},
+    "radar3": {"TOA_start": 1.5e-6, "AOA": 87, "Amp": -33, "Freq": 9.42e9, "PW": 3000e-9, "PRI": 130e-6},
+    "radar4": {"TOA_start": 75e-3, "AOA": 50, "Amp": -30, "Freq": 9.35e9, "PW": 500e-9, "PRI": 9e-6}
+}
+
+# Function to add uncertainty to a value
+def add_uncertainty(value, resolution, prob=0.2):
+    if random.random() < prob:  # 20% probability to add uncertainty
+        adjustment = resolution if random.random() < 0.5 else -resolution
+        value += adjustment
+    return value
+
+# Function to add pulse loss
+def apply_pulse_loss(pdw_list, loss_percentage):
+    # Randomly discard pulses according to the loss percentage
+    retained_pulses = []
+    for pdw in pdw_list:
+        if random.random() > loss_percentage / 100.0:  # Retain if not lost
+            retained_pulses.append(pdw)
+    return retained_pulses
+
+# PDW Generator function with uncertainty and pulse loss
+def generate_pdw(radar_type, duration=3, pulse_loss_percentage=0, add_uncertainties=False):
+    radar = radar_parameters[radar_type]
+    pdw_list = []
+    current_time = radar["TOA_start"]
+
+    while current_time < duration:
+        # Generate PDW based on radar parameters
+        TOA = current_time  # Time of arrival
+        AOA = radar["AOA"]  # Angle of arrival
+        Amp = radar["Amp"]  # Amplitude
+        Freq = radar["Freq"]  # RF frequency
+        PW = radar["PW"]  # Pulse width
+
+        if add_uncertainties:
+            # Add uncertainty to PDW fields
+            TOA = add_uncertainty(TOA, TOA_RES)
+            AOA = add_uncertainty(AOA, AOA_RES)
+            Amp = add_uncertainty(Amp, AMP_RES)
+            Freq = add_uncertainty(Freq, FREQ_RES)
+            PW = add_uncertainty(PW, PW_RES)
+
+        # Append the PDW (TOA, AOA, Amp, Freq, PW) as a tuple
+        pdw_list.append((TOA, AOA, Amp, Freq, PW))
+        
+        # Update TOA based on radar's PRI (Pulse Repetition Interval)
+        current_time += radar["PRI"]
+    
+    # Apply pulse loss to PDW list
+    if pulse_loss_percentage > 0:
+        pdw_list = apply_pulse_loss(pdw_list, pulse_loss_percentage)
+
+    return pdw_list
+
+
+# Function to save PDW list to a CSV file
+def save_pdw_list_to_csv(pdw_list, filename):
+    with open(filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['TOA', 'AOA', 'Amplitude', 'Frequency', 'Pulse Width'])
+        for pdw in pdw_list:
+            writer.writerow(pdw)
+            
+
+# Function to plot amplitude vs TOA for each radar's PDW list
+def plot_amplitude_vs_toa(pdw_list, radar_name):
+    toa_values = [pdw[0] for pdw in pdw_list]
+    amplitude_values = [pdw[2] for pdw in pdw_list]
+    
+    plt.figure()
+    plt.plot(toa_values, amplitude_values, marker='o', label=f"{radar_name}")
+    plt.title(f"Amplitude vs TOA - {radar_name}")
+    plt.xlabel("Time of Arrival (s)")
+    plt.ylabel("Amplitude (dBm)")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    
+    
+    
+pdw_radar1_with_uncertainty_no_loss = generate_pdw("radar1", pulse_loss_percentage=0, add_uncertainties=True)
+pdw_radar2_with_uncertainty_no_loss = generate_pdw("radar2", pulse_loss_percentage=0, add_uncertainties=True)
+pdw_radar3_with_uncertainty_no_loss = generate_pdw("radar3", pulse_loss_percentage=0, add_uncertainties=True)
+pdw_radar4_with_uncertainty_no_loss = generate_pdw("radar4", pulse_loss_percentage=0, add_uncertainties=True)
+
+# Step 2: Save PDW lists with uncertainties and no pulse loss to CSV files
+save_pdw_list_to_csv(pdw_radar1_with_uncertainty_no_loss, "radar1_with_uncertainty_no_loss.csv")
+save_pdw_list_to_csv(pdw_radar2_with_uncertainty_no_loss, "radar2_with_uncertainty_no_loss.csv")
+save_pdw_list_to_csv(pdw_radar3_with_uncertainty_no_loss, "radar3_with_uncertainty_no_loss.csv")
+save_pdw_list_to_csv(pdw_radar4_with_uncertainty_no_loss, "radar4_with_uncertainty_no_loss.csv")
+
+plot_amplitude_vs_toa(pdw_radar1_with_uncertainty_no_loss, "Radar 1 (Uncertainty, No Loss)")
+plot_amplitude_vs_toa(pdw_radar2_with_uncertainty_no_loss, "Radar 2 (Uncertainty, No Loss)")
+plot_amplitude_vs_toa(pdw_radar3_with_uncertainty_no_loss, "Radar 3 (Uncertainty, No Loss)")
+plot_amplitude_vs_toa(pdw_radar4_with_uncertainty_no_loss, "Radar 4 (Uncertainty, No Loss)")
